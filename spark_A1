@@ -1,0 +1,34 @@
+from pyspark import SparkContext
+from datetime import datetime
+
+	def getData(record):
+	    try:
+	        video_id,trending_date,category_id,category,publish_time,views,likes,dislikes,comment_count,ratings_disabled,video_error_or_removed,country = record.split(",")
+	        if(trending_date != 'trending_date'):
+	            trending_date = datetime.strftime(datetime.strptime(trending_date, '%y.%d.%m'),'%Y-%m-%d')
+	        return ((video_id,country), (video_id,country,trending_date,category,likes,dislikes))
+	    except:
+	        return ()
+
+	def trendingVideos(record):
+	    return (str(record[1][0]),record[1][1],str(record[1][2]),str(record[1][3]))
+
+	def calculate(record):
+	    disgrowth = (int(record[1][5]) - int(record[0][5])) - (int(record[1][4]) - int(record[0][4]))
+	    return ((disgrowth),(record[0][0],disgrowth,record[0][3],record[0][1]))
+
+
+	sc = SparkContext()
+	input = sc.textFile("AllVideos_short.csv")
+
+	conData = input.map(getData).groupByKey().filter(lambda x: len(x[1]) >= 2)
+
+	conGroupDataOne = conData.map(lambda rec: sorted(list(rec[1]), key=lambda k: k[2])[0:2])
+
+	inc = conGroupDataOne.map(calculate).sortByKey(ascending= False)
+
+	trendRate = inc.map(trendingVideos)
+	sc.parallelize(trendRate.take(10)).saveAsTextFile('output')
+
+	for i in inc.take(10):
+	    print("{},{},{},{}".format(i[1][0],i[1][1],i[1][2],i[1][3]))
